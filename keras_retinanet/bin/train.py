@@ -51,6 +51,10 @@ from ..utils.model import freeze as freeze_model
 from ..utils.tf_version import check_tf_version
 from ..utils.transform import random_transform_generator
 
+import wandb
+from wandb.keras import WandbCallback
+
+wandb.init()
 
 def makedirs(path):
     # Intended behavior: try to create the directory,
@@ -143,7 +147,7 @@ def create_callbacks(model, training_model, prediction_model, validation_generat
         A list of callbacks used for training.
     """
     callbacks = []
-
+    callbacks.append(WandbCallback())
     tensorboard_callback = None
 
     if args.tensorboard_dir:
