@@ -25,6 +25,7 @@ import cv2
 import progressbar
 assert(callable(progressbar.progressbar)), "Using wrong progressbar module, install 'progressbar2' instead."
 
+from ..bin.debug import make_output_path
 
 def _compute_ap(recall, precision):
     """ Compute the average precision, given the recall and precision curves.
@@ -104,8 +105,9 @@ def _get_detections(generator, model, score_threshold=0.05, max_detections=100, 
         if save_path is not None:
             draw_annotations(raw_image, generator.load_annotations(i), label_to_name=generator.label_to_name)
             draw_detections(raw_image, image_boxes, image_scores, image_labels, label_to_name=generator.label_to_name, score_threshold=score_threshold)
-
-            cv2.imwrite(os.path.join(save_path, '{}.png'.format(i)), raw_image)
+            output_path = make_output_path(save_path, generator.image_path(i), flatten=False)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            cv2.imwrite(output_path, raw_image)
 
         # copy detections to all_detections
         for label in range(generator.num_classes()):
