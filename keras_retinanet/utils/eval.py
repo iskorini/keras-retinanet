@@ -26,6 +26,7 @@ import progressbar
 assert(callable(progressbar.progressbar)), "Using wrong progressbar module, install 'progressbar2' instead."
 
 from ..bin.debug import make_output_path
+from pathlib import Path
 
 def _compute_ap(recall, precision):
     """ Compute the average precision, given the recall and precision curves.
@@ -106,6 +107,10 @@ def _get_detections(generator, model, score_threshold=0.05, max_detections=100, 
             draw_annotations(raw_image, generator.load_annotations(i), label_to_name=generator.label_to_name)
             draw_detections(raw_image, image_boxes, image_scores, image_labels, label_to_name=generator.label_to_name, score_threshold=score_threshold)
             output_path = make_output_path(save_path, generator.image_path(i), flatten=False)
+            # only for KAIST MPD
+            output_path = str(output_path).replace('/data/dataset/KAIST_MPD/rgbt-ped-detection/data/kaist-rgbt/images', '')
+            output_path = Path(output_path.replace('/lwir', ''))
+            # ------------------
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             cv2.imwrite(output_path, raw_image)
 
