@@ -3,4 +3,4 @@
 	url = https://github.com/fizyr/keras-retinanet-test-data.git
 [submodule "tpu"]
 	path = tpu
-	url = https://github.com/tensorflow/tpu/
+	url = https://github.com/iskorini/tpu/
