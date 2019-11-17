@@ -85,7 +85,7 @@ def policy_vtest():
   # (operation, probability, magnitude). Each element in policy is a
   # sub-policy that will be applied sequentially on the image.
   policy = [
-      [('TranslateX_BBox', 1.0, 4), ('Equalize', 1.0, 10)],
+      [('Rotate_BBox', 1.0, 4), ('Equalize', 1.0, 10)],
   ]
   return policy
 
