@@ -88,6 +88,7 @@ def create_generator(args):
             visual_effect_generator=visual_effect_generator,
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
+            auto_augment=args.auto_augment,
             config=args.config
         )
     elif args.dataset_type == 'pascal':
@@ -98,6 +99,7 @@ def create_generator(args):
             visual_effect_generator=visual_effect_generator,
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
+            auto_augment=args.auto_augment,
             config=args.config
         )
     elif args.dataset_type == 'csv':
@@ -108,6 +110,7 @@ def create_generator(args):
             visual_effect_generator=visual_effect_generator,
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
+            auto_augment=args.auto_augment,
             config=args.config
         )
     elif args.dataset_type == 'oid':
@@ -122,6 +125,7 @@ def create_generator(args):
             visual_effect_generator=visual_effect_generator,
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
+            auto_augment=args.auto_augment,
             config=args.config
         )
     elif args.dataset_type == 'kitti':
@@ -132,6 +136,7 @@ def create_generator(args):
             visual_effect_generator=visual_effect_generator,
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
+            auto_augment=args.auto_augment,
             config=args.config
         )
     else:
@@ -185,7 +190,7 @@ def parse_args(args):
     parser.add_argument('--no-gui', help='Do not open a GUI window. Save images to an output directory instead.', action='store_true')
     parser.add_argument('--output-dir', help='The output directory to save images to if --no-gui is specified.', default='.')
     parser.add_argument('--flatten-output', help='Flatten the folder structure of saved output images into a single folder.', action='store_true')
-
+    parser.add_argument('--auto-augment',     help='Use autoaugment policy. Only CSV', type=str, dest='auto_augment', default = None)
     return parser.parse_args(args)
 
 
