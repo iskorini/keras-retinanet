@@ -85,7 +85,7 @@ def policy_vtest():
   # (operation, probability, magnitude). Each element in policy is a
   # sub-policy that will be applied sequentially on the image.
   policy = [
-      [('Rotate_BBox', 1.0, 4), ('Equalize', 1.0, 10)],
+      [('Rotate_BBox', 1.0, 4), ('Equalize', 0, 0)],
   ]
   return policy
 
@@ -255,6 +255,7 @@ def solarize_add(image, addition=0, threshold=128):
   # of 'addition' is between -128 and 128.
   added_image = tf.cast(image, tf.int64) + addition
   added_image = tf.cast(tf.clip_by_value(added_image, 0, 255), tf.uint8)
+  image = tf.cast(image, tf.uint8) # fix'd
   return tf.compat.v1.where(image < threshold, added_image, image)
 
 
@@ -552,6 +553,9 @@ def _apply_bbox_augmentation(image, bbox, augmentation_func, *args):
                         [0, 0]],
                        constant_values=1)
   # Replace the old bbox content with the new augmented content.
+  augmented_bbox_content = tf.cast(augmented_bbox_content, tf.uint8)
+  image = tf.cast(image, tf.uint8)
+  mask_tensor = tf.cast(mask_tensor, tf.uint8)
   image = image * mask_tensor + augmented_bbox_content
   return image
 
@@ -1123,6 +1127,7 @@ def sharpness(image, factor):
   mask = tf.ones_like(degenerate)
   padded_mask = tf.pad(tensor=mask, paddings=[[1, 1], [1, 1], [0, 0]])
   padded_degenerate = tf.pad(tensor=degenerate, paddings=[[1, 1], [1, 1], [0, 0]])
+  orig_image = tf.cast(orig_image, tf.uint8)
   result = tf.compat.v1.where(tf.equal(padded_mask, 1), padded_degenerate, orig_image)
 
   # Blend the final result.
@@ -1621,7 +1626,6 @@ def distort_image_with_autoaugment(image, bboxes, augmentation_name):
     'cutout_bbox_const':50,
     'translate_bbox_const':120
   }
-
   return build_and_apply_nas_policy(policy, image, bboxes, augmentation_hparams)
 
 def random_transform_generator(**kwargs):

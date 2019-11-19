@@ -253,32 +253,35 @@ class Generator(keras.utils.Sequence):
     def auto_augument_group_entry(self, image, annotations):
         """ Randomly auto-augment image and annotation.
         """
-        normalized_annotations = np.zeros(annotations['bboxes'].shape)
-        normalized_annotations[:,0] = annotations['bboxes'][:,0] / 640
-        normalized_annotations[:,2] = annotations['bboxes'][:,2] / 640
-        normalized_annotations[:,1] = annotations['bboxes'][:,1] / 512
-        normalized_annotations[:,3] = annotations['bboxes'][:,3] / 512
-        normalized_annotations[:, [0,1]] = normalized_annotations[:,[1,0]]
-        normalized_annotations[:, [3,2]] = normalized_annotations[:,[2,3]]
-        normalized_annotations = tf.compat.v2.convert_to_tensor(normalized_annotations, dtype=tf.float32)
-        augmented_img, augmented_annotation = distort_image_with_autoaugment(
-            tf.compat.v2.convert_to_tensor(image, dtype=tf.float32), 
-            normalized_annotations, 
-            'v0')
-        augmented_annotation = augmented_annotation.numpy()
-        augmented_annotation[:, [0,1]] = augmented_annotation[:,[1,0]]
-        augmented_annotation[:, [3,2]] = augmented_annotation[:,[2,3]]
-        augmented_annotation[:, 0] = augmented_annotation[:, 0] * 640
-        augmented_annotation[:, 2] = augmented_annotation[:, 2] * 640
-        augmented_annotation[:, 1] = augmented_annotation[:, 1] * 512
-        augmented_annotation[:, 3] = augmented_annotation[:, 3] * 512
-        augmented_annotation = augmented_annotation.astype(int)
-        augmented_img = augmented_img.numpy().astype(np.uint8)
-        new_annotations = {
-            'labels': annotations['labels'],
-            'bboxes': augmented_annotation
-        }
-        return augmented_img, new_annotations
+        if self.auto_augment is not None:
+            if annotations['bboxes'].shape[0] is 0:
+                return image, annotations
+            normalized_annotations = np.zeros(annotations['bboxes'].shape)
+            normalized_annotations[:,0] = annotations['bboxes'][:,0] / 640
+            normalized_annotations[:,2] = annotations['bboxes'][:,2] / 640
+            normalized_annotations[:,1] = annotations['bboxes'][:,1] / 512
+            normalized_annotations[:,3] = annotations['bboxes'][:,3] / 512
+            normalized_annotations[:, [0,1]] = normalized_annotations[:,[1,0]]
+            normalized_annotations[:, [3,2]] = normalized_annotations[:,[2,3]]
+            normalized_annotations = tf.compat.v2.convert_to_tensor(normalized_annotations, dtype=tf.float32)
+            image = tf.compat.v2.convert_to_tensor(image, dtype=tf.float32)
+            augmented_img, augmented_annotation = distort_image_with_autoaugment(
+                image, normalized_annotations, self.auto_augment)
+            augmented_annotation = augmented_annotation.numpy()
+            augmented_annotation[:, [0,1]] = augmented_annotation[:,[1,0]]
+            augmented_annotation[:, [3,2]] = augmented_annotation[:,[2,3]]
+            augmented_annotation[:, 0] = augmented_annotation[:, 0] * 640
+            augmented_annotation[:, 2] = augmented_annotation[:, 2] * 640
+            augmented_annotation[:, 1] = augmented_annotation[:, 1] * 512
+            augmented_annotation[:, 3] = augmented_annotation[:, 3] * 512
+            #augmented_annotation = augmented_annotation.astype(int)
+            augmented_img = augmented_img.numpy()#.astype(int)
+            new_annotations = {
+                'labels': annotations['labels'],
+                'bboxes': augmented_annotation#.astype(np.float32)
+            }
+            return augmented_img, new_annotations
+        return image, annotations
 
     def auto_aument_group(self, image_group, annotations_group):
         """ Apply AutoAugment policy to each image and its annotations.
@@ -288,7 +291,10 @@ class Generator(keras.utils.Sequence):
 
         for index in range(len(image_group)):
             # transform a single group entry
-            image_group[index], annotations_group[index] = self.auto_augument_group_entry(image_group[index], annotations_group[index])
+            image_group[index], annotations_group[index] = self.auto_augument_group_entry(
+                image_group[index], 
+                annotations_group[index]
+                )
         return image_group, annotations_group
 
     def resize_image(self, image):
@@ -386,15 +392,14 @@ class Generator(keras.utils.Sequence):
         # load images and annotations
         image_group       = self.load_image_group(group)
         annotations_group = self.load_annotations_group(group)
-
         # check validity of annotations
         image_group, annotations_group = self.filter_annotations(image_group, annotations_group, group)
 
         # randomly apply visual effect
-        image_group, annotations_group = self.random_visual_effect_group(image_group, annotations_group)
+        #image_group, annotations_group = self.random_visual_effect_group(image_group, annotations_group)
 
         # randomly transform data
-        image_group, annotations_group = self.random_transform_group(image_group, annotations_group)
+        #image_group, annotations_group = self.random_transform_group(image_group, annotations_group)
         
         # apply auto augment
         image_group, annotations_group = self.auto_aument_group(image_group, annotations_group)

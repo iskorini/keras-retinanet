@@ -48,7 +48,7 @@ from ..utils.keras_version import check_keras_version
 from ..utils.tf_version import check_tf_version
 from ..utils.transform import random_transform_generator
 from ..utils.visualization import draw_annotations, draw_boxes, draw_caption
-
+from ..utils.gpu import setup_gpu
 
 def create_generator(args):
     """ Create the data generators.
@@ -178,8 +178,8 @@ def parse_args(args):
     csv_parser = subparsers.add_parser('csv')
     csv_parser.add_argument('annotations', help='Path to CSV file containing annotations for evaluation.')
     csv_parser.add_argument('classes',     help='Path to a CSV file containing class label mapping.')
-
-    parser.add_argument('--no-resize', help='Disable image resizing.', dest='resize', action='store_false')
+    parser.add_argument('--gpu',              help='Id of the GPU to use (as reported by nvidia-smi).')
+    parser.add_argument('--resize', help='Disable image resizing.', dest='resize', action='store_true', default='False')
     parser.add_argument('--anchors', help='Show positive anchors on the image.', action='store_true')
     parser.add_argument('--display-name', help='Display image name on the bottom left corner.', action='store_true')
     parser.add_argument('--annotations', help='Show annotations on the image. Green annotations have anchors, red annotations don\'t and therefore don\'t contribute to training.', action='store_true')
@@ -214,10 +214,12 @@ def run(generator, args, anchor_params):
                 image, annotations = generator.random_visual_effect_group_entry(image, annotations)
 
             # resize the image and annotations
-            if args.resize:
-                image, image_scale = generator.resize_image(image)
-                annotations['bboxes'] *= image_scale
-
+            #if args.resize:
+            #    print('resize')
+            #    image, image_scale = generator.resize_image(image)
+            #    annotations['bboxes'] *= image_scale
+            if args.auto_augment:
+                image, annotations = generator.auto_augument_group_entry(image, annotations)
             anchors = anchors_for_shape(image.shape, anchor_params=anchor_params)
             positive_indices, _, max_indices = compute_gt_annotations(anchors, annotations['bboxes'])
 
@@ -297,7 +299,8 @@ def main(args=None):
     if args is None:
         args = sys.argv[1:]
     args = parse_args(args)
-
+    if args.gpu:
+        setup_gpu(args.gpu)
     # make sure keras and tensorflow are the minimum required version
     check_keras_version()
     check_tf_version()
