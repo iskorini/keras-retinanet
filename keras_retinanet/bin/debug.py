@@ -89,6 +89,7 @@ def create_generator(args):
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
             auto_augment=args.auto_augment,
+            rand_augment=args.rand_augment,
             config=args.config
         )
     elif args.dataset_type == 'pascal':
@@ -100,6 +101,7 @@ def create_generator(args):
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
             auto_augment=args.auto_augment,
+            rand_augment=args.rand_augment,
             config=args.config
         )
     elif args.dataset_type == 'csv':
@@ -111,6 +113,7 @@ def create_generator(args):
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
             auto_augment=args.auto_augment,
+            rand_augment=args.rand_augment,
             config=args.config
         )
     elif args.dataset_type == 'oid':
@@ -126,6 +129,7 @@ def create_generator(args):
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
             auto_augment=args.auto_augment,
+            rand_augment=args.rand_augment,
             config=args.config
         )
     elif args.dataset_type == 'kitti':
@@ -137,6 +141,7 @@ def create_generator(args):
             image_min_side=args.image_min_side,
             image_max_side=args.image_max_side,
             auto_augment=args.auto_augment,
+            rand_augment=args.rand_augment,
             config=args.config
         )
     else:
@@ -191,6 +196,7 @@ def parse_args(args):
     parser.add_argument('--output-dir', help='The output directory to save images to if --no-gui is specified.', default='.')
     parser.add_argument('--flatten-output', help='Flatten the folder structure of saved output images into a single folder.', action='store_true')
     parser.add_argument('--auto-augment',     help='Use autoaugment policy. Only CSV', type=str, dest='auto_augment', default = None)
+    parser.add_argument('--rand-augment', help='Use random data augmentation policy.', type=int, nargs=2, dest='rand_augment', default=None)
     return parser.parse_args(args)
 
 
@@ -220,6 +226,8 @@ def run(generator, args, anchor_params):
             #    annotations['bboxes'] *= image_scale
             if args.auto_augment:
                 image, annotations = generator.auto_augument_group_entry(image, annotations)
+            if args.rand_augment:
+                image, annotations = generator.rand_augment_group_entry(image, annotations, args.rand_augment[0], args.rand_augment[1])
             anchors = anchors_for_shape(image.shape, anchor_params=anchor_params)
             positive_indices, _, max_indices = compute_gt_annotations(anchors, annotations['bboxes'])
 

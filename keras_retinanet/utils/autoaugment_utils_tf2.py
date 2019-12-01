@@ -1628,11 +1628,52 @@ def distort_image_with_autoaugment(image, bboxes, augmentation_name):
   }
   return build_and_apply_nas_policy(policy, image, bboxes, augmentation_hparams)
 
-def random_transform_generator(**kwargs):
-    """ Create an auto-augment generator.
-
-    Args
-        selected_policy:    v0, v1 or v2.
-    """
-    while True:
-        yield random_transform(prng=prng, **kwargs)
+def distort_image_with_rand_augment(image, bboxes, N, M):
+  """Applies randaugment policy to input image.
+  Paper: https://arxiv.org/abs/1909.13719
+  
+  Args:
+    'image': 'Tensor' of shape [height, width, 3] representing an image.
+    'N': integer, Number of transformation to apply to an image.
+    'M': integer, shared Magnitude for all augmentation operations.
+  
+  Returns:
+    A tuple containing the augmented versions of `image` and `bboxes`.
+  """
+  augmentation_hparams = {
+    'cutout_max_pad_fraction':0.75,
+    'cutout_bbox_replace_with_mean':False,
+    'cutout_const':100,
+    'translate_const':250,
+    'cutout_bbox_const':50,
+    'translate_bbox_const':120
+  }
+  replace_value = [128] * 3 #[128, 128, 128] LOL
+  tf.compat.v1.logging.info('Using RandAug.')
+  available_ops = ['AutoContrast','Equalize','Solarize','SolarizeAdd','Contrast','Brightness',
+    'Sharpness','Cutout','BBox_Cutout','Rotate_BBox','TranslateX_BBox','TranslateY_BBox',
+    'ShearX_BBox','ShearY_BBox','Rotate_Only_BBoxes','ShearX_Only_BBoxes','ShearY_Only_BBoxes',
+    'TranslateX_Only_BBoxes','TranslateY_Only_BBoxes','Flip_Only_BBoxes','Solarize_Only_BBoxes',
+    'Equalize_Only_BBoxes','Cutout_Only_BBoxes']
+    #['AutoContrast','Equalize','Posterize','Solarize','SolarizeAdd','Color','Contrast','Brightness',
+    #'Sharpness','Cutout','BBox_Cutout','Rotate_BBox','TranslateX_BBox','TranslateY_BBox',
+    #'ShearX_BBox','ShearY_BBox','Rotate_Only_BBoxes','ShearX_Only_BBoxes','ShearY_Only_BBoxes',
+    #'TranslateX_Only_BBoxes','TranslateY_Only_BBoxes','Flip_Only_BBoxes','Solarize_Only_BBoxes',
+    #'Equalize_Only_BBoxes','Cutout_Only_BBoxes']
+  for layer_num in range(N):
+    op_to_select = tf.random.uniform(
+        [], maxval=len(available_ops), dtype=tf.int32) #Select N operations
+    random_magnitude = float(M) #cast magnitude to float (???)
+    with tf.compat.v1.name_scope('randaug_layer_{}'.format(layer_num)):
+      for (i, op_name) in enumerate(available_ops): #for all available_ops
+        prob = tf.random.uniform([], minval=0.2, maxval=0.8, dtype=tf.float32) 
+        func, _, args = _parse_policy_info(op_name, prob, random_magnitude,
+                                           replace_value, augmentation_hparams) #create function for RA
+        image, bboxes = tf.cond(
+            pred=tf.equal(i, op_to_select),
+            # pylint:disable=g-long-lambda
+            true_fn=lambda selected_func=func, selected_args=args: selected_func(
+                image, bboxes, *selected_args),
+            # pylint:enable=g-long-lambda
+            false_fn=lambda: (image, bboxes)) 
+  return image, bboxes
