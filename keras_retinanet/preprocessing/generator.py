@@ -257,13 +257,15 @@ class Generator(keras.utils.Sequence):
         """ Randomly auto-augment image and annotation.
         """
         if self.auto_augment is not None:
+            image_width = image.shape[1]
+            image_height = image.shape[0]
             if annotations['bboxes'].shape[0] is 0:
                 return image, annotations
             normalized_annotations = np.zeros(annotations['bboxes'].shape)
-            normalized_annotations[:,0] = annotations['bboxes'][:,0] / 640
-            normalized_annotations[:,2] = annotations['bboxes'][:,2] / 640
-            normalized_annotations[:,1] = annotations['bboxes'][:,1] / 512
-            normalized_annotations[:,3] = annotations['bboxes'][:,3] / 512
+            normalized_annotations[:,0] = annotations['bboxes'][:,0] / image_width
+            normalized_annotations[:,2] = annotations['bboxes'][:,2] / image_width
+            normalized_annotations[:,1] = annotations['bboxes'][:,1] / image_height
+            normalized_annotations[:,3] = annotations['bboxes'][:,3] / image_height
             normalized_annotations[:, [0,1]] = normalized_annotations[:,[1,0]]
             normalized_annotations[:, [3,2]] = normalized_annotations[:,[2,3]]
             normalized_annotations = tf.compat.v2.convert_to_tensor(normalized_annotations, dtype=tf.float32)
@@ -273,10 +275,10 @@ class Generator(keras.utils.Sequence):
             augmented_annotation = augmented_annotation.numpy()
             augmented_annotation[:, [0,1]] = augmented_annotation[:,[1,0]]
             augmented_annotation[:, [3,2]] = augmented_annotation[:,[2,3]]
-            augmented_annotation[:, 0] = augmented_annotation[:, 0] * 640
-            augmented_annotation[:, 2] = augmented_annotation[:, 2] * 640
-            augmented_annotation[:, 1] = augmented_annotation[:, 1] * 512
-            augmented_annotation[:, 3] = augmented_annotation[:, 3] * 512
+            augmented_annotation[:, 0] = augmented_annotation[:, 0] * image_width
+            augmented_annotation[:, 2] = augmented_annotation[:, 2] * image_width
+            augmented_annotation[:, 1] = augmented_annotation[:, 1] * image_height
+            augmented_annotation[:, 3] = augmented_annotation[:, 3] * image_height
             #augmented_annotation = augmented_annotation.astype(int)
             augmented_img = augmented_img.numpy()#.astype(int)
             new_annotations = {
@@ -299,17 +301,20 @@ class Generator(keras.utils.Sequence):
         return image_group, annotations_group
 
 
-    def rand_augment_group_entry(self, image, annotations, N, M):
+    def rand_augment_group_entry(self, image, annotations):
         """ Randomly auto-augment image and annotation.
         """
         if self.rand_augment is not None:
+            image_width = image.shape[1]
+            image_height = image.shape[0]
+            N, M = self.rand_augment[0], self.rand_augment[1] #N and M
             if annotations['bboxes'].shape[0] is 0:
                 return image, annotations
             normalized_annotations = np.zeros(annotations['bboxes'].shape)
-            normalized_annotations[:,0] = annotations['bboxes'][:,0] / 640
-            normalized_annotations[:,2] = annotations['bboxes'][:,2] / 640
-            normalized_annotations[:,1] = annotations['bboxes'][:,1] / 512
-            normalized_annotations[:,3] = annotations['bboxes'][:,3] / 512
+            normalized_annotations[:,0] = annotations['bboxes'][:,0] / image_width
+            normalized_annotations[:,2] = annotations['bboxes'][:,2] / image_width
+            normalized_annotations[:,1] = annotations['bboxes'][:,1] / image_height
+            normalized_annotations[:,3] = annotations['bboxes'][:,3] / image_height
             normalized_annotations[:, [0,1]] = normalized_annotations[:,[1,0]]
             normalized_annotations[:, [3,2]] = normalized_annotations[:,[2,3]]
             normalized_annotations = tf.compat.v2.convert_to_tensor(normalized_annotations, dtype=tf.float32)
@@ -319,10 +324,10 @@ class Generator(keras.utils.Sequence):
             augmented_annotation = augmented_annotation.numpy()
             augmented_annotation[:, [0,1]] = augmented_annotation[:,[1,0]]
             augmented_annotation[:, [3,2]] = augmented_annotation[:,[2,3]]
-            augmented_annotation[:, 0] = augmented_annotation[:, 0] * 640
-            augmented_annotation[:, 2] = augmented_annotation[:, 2] * 640
-            augmented_annotation[:, 1] = augmented_annotation[:, 1] * 512
-            augmented_annotation[:, 3] = augmented_annotation[:, 3] * 512
+            augmented_annotation[:, 0] = augmented_annotation[:, 0] * image_width
+            augmented_annotation[:, 2] = augmented_annotation[:, 2] * image_width
+            augmented_annotation[:, 1] = augmented_annotation[:, 1] * image_height
+            augmented_annotation[:, 3] = augmented_annotation[:, 3] * image_height
             
             augmented_img = augmented_img.numpy()
             new_annotations = {
@@ -332,7 +337,7 @@ class Generator(keras.utils.Sequence):
             return augmented_img, new_annotations
         return image, annotations
 
-    def rand_augment_group(self, image_group, annotations_group, N, M):
+    def rand_augment_group(self, image_group, annotations_group):
         """ Apply RandAugment policy to each image and its annotations.
         """
 
@@ -342,8 +347,7 @@ class Generator(keras.utils.Sequence):
             # transform a single group entry
             image_group[index], annotations_group[index] = self.rand_augment_group_entry(
                 image_group[index], 
-                annotations_group[index], N, M
-                )
+                annotations_group[index])
         return image_group, annotations_group
 
     def resize_image(self, image):
@@ -454,8 +458,7 @@ class Generator(keras.utils.Sequence):
         image_group, annotations_group = self.auto_augment_group(image_group, annotations_group)
 
         # apply rand augment
-        image_group, annotations_group = self.rand_augment_group(
-            image_group, annotations_group, self.rand_augment[0], self.rand_augment[1])
+        image_group, annotations_group = self.rand_augment_group(image_group, annotations_group)
 
         # perform preprocessing steps
         image_group, annotations_group = self.preprocess_group(image_group, annotations_group)

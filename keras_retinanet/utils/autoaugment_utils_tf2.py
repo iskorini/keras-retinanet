@@ -85,7 +85,7 @@ def policy_vtest():
   # (operation, probability, magnitude). Each element in policy is a
   # sub-policy that will be applied sequentially on the image.
   policy = [
-      [('Rotate_BBox', 1.0, 4), ('Equalize', 0, 0)],
+      [('BBox_Cutout', 1.0, 4), ('Equalize', 0, 0)],
   ]
   return policy
 
@@ -1285,7 +1285,6 @@ def _cutout_inside_bbox(image, bbox, pad_fraction):
   cutout_shape = [image_height - (lower_pad + upper_pad),
                   image_width - (left_pad + right_pad)]
   padding_dims = [[lower_pad, upper_pad], [left_pad, right_pad]]
-
   mask = tf.pad(
       tensor=tf.zeros(cutout_shape, dtype=image.dtype),
       paddings=padding_dims, constant_values=1)

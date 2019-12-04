@@ -222,7 +222,8 @@ def create_generators(args, preprocess_image):
         'image_max_side'   : args.image_max_side,
         'no_resize'        : args.no_resize,
         'preprocess_image' : preprocess_image,
-        'auto_augment'     : args.auto_augment
+        'auto_augment'     : args.auto_augment,
+        'rand_augment'     : args.rand_augment
     }
     # create random transform generator for augmenting training data
     if args.random_transform:
