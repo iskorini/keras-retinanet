@@ -49,6 +49,10 @@ from ..utils.model import freeze as freeze_model
 from ..utils.transform import random_transform_generator
 from ..utils.image import random_visual_effect_generator
 
+import wandb
+from wandb.keras import WandbCallback
+
+wandb.init()
 
 def makedirs(path):
     # Intended behavior: try to create the directory,
@@ -149,7 +153,8 @@ def create_callbacks(model, training_model, prediction_model, validation_generat
         A list of callbacks used for training.
     """
     callbacks = []
-
+    callbacks = []
+    callbacks.append(WandbCallback())
     tensorboard_callback = None
 
     if args.tensorboard_dir:
@@ -220,7 +225,9 @@ def create_generators(args, preprocess_image):
         'config'           : args.config,
         'image_min_side'   : args.image_min_side,
         'image_max_side'   : args.image_max_side,
+        'no_resize'        : True, #If True, no image/annotation resizing is performed.
         'preprocess_image' : preprocess_image,
+        'rand_augment'     : args.rand_augment
     }
 
     # create random transform generator for augmenting training data
@@ -416,7 +423,7 @@ def parse_args(args):
     parser.add_argument('--multi-gpu',        help='Number of GPUs to use for parallel processing.', type=int, default=0)
     parser.add_argument('--multi-gpu-force',  help='Extra flag needed to enable (experimental) multi-gpu support.', action='store_true')
     parser.add_argument('--epochs',           help='Number of epochs to train.', type=int, default=50)
-    parser.add_argument('--steps',            help='Number of steps per epoch.', type=int, default=10000)
+    parser.add_argument('--steps',            help='Number of steps per epoch.', type=int, default=2500)
     parser.add_argument('--lr',               help='Learning rate.', type=float, default=1e-5)
     parser.add_argument('--snapshot-path',    help='Path to store snapshots of models during training (defaults to \'./snapshots\')', default='./snapshots')
     parser.add_argument('--tensorboard-dir',  help='Log directory for Tensorboard output', default='./logs')
@@ -429,7 +436,8 @@ def parse_args(args):
     parser.add_argument('--config',           help='Path to a configuration parameters .ini file.')
     parser.add_argument('--weighted-average', help='Compute the mAP using the weighted average of precisions among classes.', action='store_true')
     parser.add_argument('--compute-val-loss', help='Compute validation loss during training', dest='compute_val_loss', action='store_true')
-
+    parser.add_argument('--rand-augment',     help='Use random data augmentation policy.', type=int, nargs=2, dest='rand_augment', default=None)
+    
     # Fit generator arguments
     parser.add_argument('--multiprocessing',  help='Use multiprocessing in fit_generator.', action='store_true')
     parser.add_argument('--workers',          help='Number of generator workers.', type=int, default=1)
@@ -452,6 +460,7 @@ def main(args=None):
 
     # optionally choose specific GPU
     if args.gpu:
+        print("USING GPU N "+str(args.gpu))
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     keras.backend.tensorflow_backend.set_session(get_session())
 

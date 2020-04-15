@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
-
+import tensorflow as tf
 import numpy as np
 import random
 import warnings
@@ -35,6 +35,9 @@ from ..utils.image import (
 )
 from ..utils.transform import transform_aabb
 
+from ..utils.autoaugment_utils_np import distort_image_with_autoaugment
+from ..utils.autoaugment_utils_np import distort_image_with_rand_augment
+
 
 class Generator(keras.utils.Sequence):
     """ Abstract generator class.
@@ -44,11 +47,14 @@ class Generator(keras.utils.Sequence):
         self,
         transform_generator = None,
         visual_effect_generator=None,
+        auto_augment=None,
+        rand_augment=None,
         batch_size=1,
         group_method='ratio',  # one of 'none', 'random', 'ratio'
         shuffle_groups=True,
         image_min_side=800,
         image_max_side=1333,
+        no_resize=False,
         transform_parameters=None,
         compute_anchor_targets=anchor_targets_bbox,
         compute_shapes=guess_shapes,
@@ -64,24 +70,28 @@ class Generator(keras.utils.Sequence):
             shuffle_groups         : If True, shuffles the groups each epoch.
             image_min_side         : After resizing the minimum side of an image is equal to image_min_side.
             image_max_side         : If after resizing the maximum side is larger than image_max_side, scales down further so that the max side is equal to image_max_side.
+            no_resize              : If True, no image/annotation resizing is performed.
             transform_parameters   : The transform parameters used for data augmentation.
             compute_anchor_targets : Function handler for computing the targets of anchors for an image and its annotations.
             compute_shapes         : Function handler for computing the shapes of the pyramid for a given input.
             preprocess_image       : Function handler for preprocessing an image (scaling / normalizing) for passing through a network.
+            auto_augment           : None, v0, v1 or v2. Policy used for AutoAugment.
         """
         self.transform_generator    = transform_generator
         self.visual_effect_generator = visual_effect_generator
+        self.auto_augment           = auto_augment
+        self.rand_augment           = rand_augment
         self.batch_size             = int(batch_size)
         self.group_method           = group_method
         self.shuffle_groups         = shuffle_groups
         self.image_min_side         = image_min_side
         self.image_max_side         = image_max_side
+        self.no_resize              = no_resize
         self.transform_parameters   = transform_parameters or TransformParameters()
         self.compute_anchor_targets = compute_anchor_targets
         self.compute_shapes         = compute_shapes
         self.preprocess_image       = preprocess_image
         self.config                 = config
-
         # Define groups
         self.group_images()
 
@@ -127,6 +137,11 @@ class Generator(keras.utils.Sequence):
         """ Compute the aspect ratio for an image with image_index.
         """
         raise NotImplementedError('image_aspect_ratio method not implemented')
+
+    def image_path(self, image_index):
+        """ Get the path to an image.
+        """
+        raise NotImplementedError('image_path method not implemented')
 
     def load_image(self, image_index):
         """ Load an image at the image_index.
@@ -194,7 +209,7 @@ class Generator(keras.utils.Sequence):
         """
         assert(len(image_group) == len(annotations_group))
 
-        if self.visual_effect_generator is None:
+        if self.visual_effect_generator is None and self.auto_augment is None:
             # do nothing
             return image_group, annotations_group
 
@@ -210,7 +225,7 @@ class Generator(keras.utils.Sequence):
         """ Randomly transforms image and annotation.
         """
         # randomly transform both image and annotations
-        if transform is not None or self.transform_generator:
+        if (transform is not None or self.transform_generator) and self.auto_augment is None:
             if transform is None:
                 transform = adjust_transform_for_image(next(self.transform_generator), image, self.transform_parameters.relative_translation)
 
@@ -236,10 +251,117 @@ class Generator(keras.utils.Sequence):
 
         return image_group, annotations_group
 
+
+    def auto_augument_group_entry(self, image, annotations):
+        """ Randomly auto-augment image and annotation.
+        """
+        if self.auto_augment is not None:
+            image_width = image.shape[1]
+            image_height = image.shape[0]
+            if annotations['bboxes'].shape[0] is 0:
+                return image, annotations
+            normalized_annotations = np.zeros(annotations['bboxes'].shape)
+            normalized_annotations[:,0] = annotations['bboxes'][:,0] / image_width
+            normalized_annotations[:,2] = annotations['bboxes'][:,2] / image_width
+            normalized_annotations[:,1] = annotations['bboxes'][:,1] / image_height
+            normalized_annotations[:,3] = annotations['bboxes'][:,3] / image_height
+            normalized_annotations[:, [0,1]] = normalized_annotations[:,[1,0]]
+            normalized_annotations[:, [3,2]] = normalized_annotations[:,[2,3]]
+            normalized_annotations = tf.convert_to_tensor(normalized_annotations, dtype=tf.float32)
+            image = tf.convert_to_tensor(image, dtype=tf.float32)
+            augmented_img, augmented_annotation = distort_image_with_autoaugment(
+                image, normalized_annotations, self.auto_augment)
+            augmented_annotation = augmented_annotation.numpy()
+            augmented_annotation[:, [0,1]] = augmented_annotation[:,[1,0]]
+            augmented_annotation[:, [3,2]] = augmented_annotation[:,[2,3]]
+            augmented_annotation[:, 0] = augmented_annotation[:, 0] * image_width
+            augmented_annotation[:, 2] = augmented_annotation[:, 2] * image_width
+            augmented_annotation[:, 1] = augmented_annotation[:, 1] * image_height
+            augmented_annotation[:, 3] = augmented_annotation[:, 3] * image_height
+            #augmented_annotation = augmented_annotation.astype(int)
+            augmented_img = augmented_img.numpy()#.astype(int)
+            new_annotations = {
+                'labels': annotations['labels'],
+                'bboxes': augmented_annotation#.astype(np.float32)
+            }
+            return augmented_img, new_annotations
+        return image, annotations
+
+    def auto_augment_group(self, image_group, annotations_group):
+        """ Apply AutoAugment policy to each image and its annotations.
+        """       
+        assert(len(image_group) == len(annotations_group))
+        for index in range(len(image_group)):
+            # transform a single group entry
+            image_group[index], annotations_group[index] = self.auto_augument_group_entry(
+                image_group[index], 
+                annotations_group[index]
+                )
+        return image_group, annotations_group
+
+    def set_rand_augment_hyperparamenters(self, N, M): 
+        """
+        only for debug purpose
+        """
+        self.rand_augment = [N, M]
+
+    def rand_augment_group_entry(self, image, annotations):
+        """ Randomly auto-augment image and annotation.
+        """
+        if self.rand_augment is not None:
+            image_width = image.shape[1]
+            image_height = image.shape[0]
+            N, M = self.rand_augment[0], self.rand_augment[1] #N and M
+            if annotations['bboxes'].shape[0] is 0:
+                return image, annotations
+            normalized_annotations = np.zeros(annotations['bboxes'].shape)
+            normalized_annotations[:,0] = annotations['bboxes'][:,0] / image_width
+            normalized_annotations[:,2] = annotations['bboxes'][:,2] / image_width
+            normalized_annotations[:,1] = annotations['bboxes'][:,1] / image_height
+            normalized_annotations[:,3] = annotations['bboxes'][:,3] / image_height
+            normalized_annotations[:, [0,1]] = normalized_annotations[:,[1,0]]
+            normalized_annotations[:, [3,2]] = normalized_annotations[:,[2,3]]
+            ###############################
+            try:
+                augmented_img, augmented_annotation = distort_image_with_rand_augment(image, normalized_annotations, N, M)
+            except:
+                print('exception!!!')
+                return image, annotations
+            if len(augmented_annotation)>0:
+                augmented_annotation[:, [0,1]] = augmented_annotation[:,[1,0]]
+                augmented_annotation[:, [3,2]] = augmented_annotation[:,[2,3]]
+                augmented_annotation[:, 0] = augmented_annotation[:, 0] * image_width
+                augmented_annotation[:, 2] = augmented_annotation[:, 2] * image_width
+                augmented_annotation[:, 1] = augmented_annotation[:, 1] * image_height
+                augmented_annotation[:, 3] = augmented_annotation[:, 3] * image_height
+            
+            new_annotations = {
+                'labels': annotations['labels'][0:len(augmented_annotation)],
+                'bboxes': augmented_annotation
+            }
+            return augmented_img, new_annotations
+        return image, annotations
+
+    def rand_augment_group(self, image_group, annotations_group):
+        """ Apply RandAugment policy to each image and its annotations.
+        """
+
+        assert(len(image_group) == len(annotations_group))
+
+        for index in range(len(image_group)):
+            # transform a single group entry
+            image_group[index], annotations_group[index] = self.rand_augment_group_entry(
+                image_group[index], 
+                annotations_group[index])
+        return image_group, annotations_group
+
     def resize_image(self, image):
         """ Resize an image using image_min_side and image_max_side.
         """
-        return resize_image(image, min_side=self.image_min_side, max_side=self.image_max_side)
+        if self.no_resize:
+            return image, 1
+        else:
+            return resize_image(image, min_side=self.image_min_side, max_side=self.image_max_side)
 
     def preprocess_group_entry(self, image, annotations):
         """ Preprocess image and its annotations.
@@ -328,15 +450,20 @@ class Generator(keras.utils.Sequence):
         # load images and annotations
         image_group       = self.load_image_group(group)
         annotations_group = self.load_annotations_group(group)
-
         # check validity of annotations
         image_group, annotations_group = self.filter_annotations(image_group, annotations_group, group)
 
         # randomly apply visual effect
-        image_group, annotations_group = self.random_visual_effect_group(image_group, annotations_group)
+        #image_group, annotations_group = self.random_visual_effect_group(image_group, annotations_group)
 
         # randomly transform data
-        image_group, annotations_group = self.random_transform_group(image_group, annotations_group)
+        #image_group, annotations_group = self.random_transform_group(image_group, annotations_group)
+        
+        # apply auto augment
+        image_group, annotations_group = self.auto_augment_group(image_group, annotations_group)
+
+        # apply rand augment
+        image_group, annotations_group = self.rand_augment_group(image_group, annotations_group)
 
         # perform preprocessing steps
         image_group, annotations_group = self.preprocess_group(image_group, annotations_group)
