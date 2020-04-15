@@ -20,7 +20,8 @@ import argparse
 import os
 import sys
 import cv2
-
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+from keras import backend as K 
 # Set keycodes for changing images
 # 81, 83 are left and right arrows on linux in Ascii code (probably not needed)
 # 65361, 65363 are left and right arrows in linux
@@ -227,7 +228,9 @@ def run(generator, args, anchor_params):
             if args.auto_augment:
                 image, annotations = generator.auto_augument_group_entry(image, annotations)
             if args.rand_augment:
-                image, annotations = generator.rand_augment_group_entry(image, annotations, args.rand_augment[0], args.rand_augment[1])
+                print(generator.image_path(i))
+                generator.set_rand_augment_hyperparamenters(args.rand_augment[0], args.rand_augment[1])
+                image, annotations = generator.rand_augment_group_entry(image, annotations)
             anchors = anchors_for_shape(image.shape, anchor_params=anchor_params)
             positive_indices, _, max_indices = compute_gt_annotations(anchors, annotations['bboxes'])
 
@@ -333,4 +336,6 @@ def main(args=None):
 
 
 if __name__ == '__main__':
-    main()
+    while True:
+        main()
+        K.clear_session()

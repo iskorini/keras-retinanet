@@ -237,4 +237,4 @@ def evaluate(
         average_precision  = _compute_ap(recall, precision)
         average_precisions[label] = average_precision, num_annotations
 
-    return average_precisions
+    return average_precisions, [false_positives, true_positives, recall, precision]

@@ -300,6 +300,11 @@ class Generator(keras.utils.Sequence):
                 )
         return image_group, annotations_group
 
+    def set_rand_augment_hyperparamenters(self, N, M): 
+        """
+        only for debug purpose
+        """
+        self.rand_augment = [N, M]
 
     def rand_augment_group_entry(self, image, annotations):
         """ Randomly auto-augment image and annotation.

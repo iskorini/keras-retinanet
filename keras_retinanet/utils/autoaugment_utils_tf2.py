@@ -1668,6 +1668,8 @@ def distort_image_with_rand_augment(image, bboxes, N, M):
         prob = tf.random.uniform([], minval=0.2, maxval=0.8, dtype=tf.float32) 
         func, _, args = _parse_policy_info(op_name, prob, random_magnitude,
                                            replace_value, augmentation_hparams) #create function for RA
+        if tf.equal(i, op_to_select):
+          print(func)
         image, bboxes = tf.cond(
             pred=tf.equal(i, op_to_select),
             # pylint:disable=g-long-lambda

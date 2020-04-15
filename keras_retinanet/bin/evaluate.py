@@ -159,7 +159,7 @@ def main(args=None):
             score_threshold=args.score_threshold,
             max_detections=args.max_detections,
             save_path=args.save_path
-        )
+        )[0]
 
         # print evaluation
         total_instances = []
